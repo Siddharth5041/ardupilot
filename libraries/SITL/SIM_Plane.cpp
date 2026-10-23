@@ -40,6 +40,7 @@ Plane::Plane(const char *frame_str) :
 
     // Chosen to approximately match a historical (simpler) battery model
     constexpr float default_battery_resistance_ohm = 0.0145f;
+    // Baterry resistance 
     battery.setup(sitl->batt_capacity_ah,
                   default_battery_resistance_ohm,
                   sitl->batt_voltage,
@@ -114,6 +115,7 @@ Plane::Plane(const char *frame_str) :
     if (strstr(frame_str, "-ice")) {
         ice_engine = true;
     }
+    // This is important 
 
     if (strstr(frame_str, "-soaring")) {
         mass = 2.0;
@@ -311,7 +313,8 @@ Vector3f Plane::getTorque(float inputAileron, float inputElevator, float inputRu
     const float c_n_r = coefficient.c_n_r;
     const float c_n_deltaa = coefficient.c_n_deltaa;
     const float c_n_deltar = coefficient.c_n_deltar;
-    const Vector3f &CGOffset = coefficient.CGOffset;
+    const Vector3f &CGOffset = coefficient.CGOffset; 
+    //This is to account for the off-set if out engine is not in the same line as COG
     
     float rho = air_density;
 
@@ -449,7 +452,9 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     //printf("Aileron: %.1f elevator: %.1f rudder: %.1f\n", aileron, elevator, rudder);
 
     float thrust = reverse_thrust ? filtered_servo_angle(input, 2) : filtered_servo_range(input, 2);
-
+    // Reads the servo index 2, that is the third servo output for throttle command
+    // and normalises the value
+    
     if (ice_engine) {
         thrust = icengine.update(input);
     } else {
@@ -457,6 +462,9 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
             thrust = 0.0f;
         }
     }
+
+    // This is to be replaced with the load-cell measurement
+    float measured_thrust_N = 20.0f; 
 
     // calculate angle of attack
     angle_of_attack = atan2f(velocity_air_bf.z, velocity_air_bf.x);
@@ -495,12 +503,13 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     
     // simulate engine RPM
     motor_mask |= (1U<<2);
+    // RPM calculation needs to be changed
     rpm[2] = thrust * 7000;
     
     // scale thrust to newtons
     thrust *= thrust_scale;
 
-    accel_body = Vector3f(thrust, 0, 0) + force;
+    accel_body = Vector3f(measured_thrust_N, 0, 0) + force;
     accel_body /= mass;
 
     // add some noise
